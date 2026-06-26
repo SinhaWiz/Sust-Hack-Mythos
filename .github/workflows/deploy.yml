@@ -1,0 +1,63 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Run Unit and Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      # Optional: In case tests need a real Redis instance in the future.
+      # Currently, tests mock Redis and RabbitMQ dependencies globally in tests/conftest.py,
+      # which guarantees they run in <10 seconds without any external services active.
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest
+        env:
+          # We pass a dummy key for testing, or rely on fallback templates validation
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AQ.MockKeyForTestingOnly12345' }}
+        run: |
+          python -m pytest -v
+
+  deploy:
+    name: Trigger Automated Deploy to Render
+    needs: test
+    runs-on: ubuntu-latest
+    # Deploy only on push to the main branch (not on pull requests)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render Deployment Hook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "WARNING: RENDER_DEPLOY_HOOK_URL is not set in GitHub Repository Secrets. Skipping deployment trigger."
+            exit 0
+          fi
+          echo "Triggering deployment to Render..."
+          curl -f -s -X GET "$DEPLOY_HOOK_URL"
+          echo "Deployment hook triggered successfully!"

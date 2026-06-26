@@ -8,7 +8,7 @@ from app.services.evidence_engine import ComplaintSignals, match_transaction, de
 from app.services.classifier import classify_case_type, determine_severity, determine_department, determine_human_review_required
 
 def test_all_10_sample_cases():
-    sample_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "start_doc", "SUST_Preli_Sample_Cases.json")
+    sample_file = os.path.join(os.path.dirname(__file__), "SUST_Preli_Sample_Cases.json")
     with open(sample_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
