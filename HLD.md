@@ -57,7 +57,7 @@ The system must **cross-reference** the complaint text against the transaction h
 
 ---
 
-## 2. System Overview
+## 2. System  Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
