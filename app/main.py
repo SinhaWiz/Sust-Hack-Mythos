@@ -104,13 +104,17 @@ async def analyze_ticket(request: AnalyzeTicketRequest):
         
         # Step 5: Generate texts using LLM
         from app.services.safety_guardrails import sanitize_complaint
+        from app.services.language import detect_language
+        
         sanitized_complaint = sanitize_complaint(request.complaint)
+        detected_lang = request.language.value if request.language else detect_language(request.complaint)
+        
         texts = generate_texts(
             sanitized_complaint,
             matched_txn_id,
             verdict,
             case_type,
-            language=request.language.value if request.language else "en",
+            language=detected_lang,
             user_type=request.user_type.value if request.user_type else "customer",
             transaction_history=request.transaction_history
         )

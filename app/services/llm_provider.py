@@ -41,7 +41,7 @@ Strict Safety Rules:
 1. NEVER promise refunds, reversals, or automatic account unblocking in the "customer_reply" or "recommended_next_action". Instead, state that the case is being reviewed.
 2. NEVER request sensitive credentials (such as PIN, OTP, password, card CVV, or full card number) from the customer.
 3. If the user type is not "merchant", the "customer_reply" MUST include a standard security reminder (e.g., "Please do not share your PIN or OTP with anyone.").
-4. Always match the language tone and language of the complaint (English, Bangla, or mixed/Banglish). If the complaint is in Bangla, reply in Bangla. If it is mixed/Banglish, use natural, professional language.
+4. Always match the language of the complaint. If the complaint language is "bn" (Bangla), reply in Bangla. If the complaint language is "en" (English), reply in English. If the complaint language is "mixed" (Banglish), reply in professional English or formal Bangla (do not write informal Banglish).
 
 Tone Adaptation:
 - Customer: Empathetic, supportive, reassuring, and clear.
@@ -124,38 +124,56 @@ Remember: Return ONLY valid JSON with fields: "agent_summary", "recommended_next
 def _fallback_templates(complaint: str, matched_txn_id: Optional[str], verdict: EvidenceVerdictEnum, case_type: CaseTypeEnum, language: Optional[str]) -> Dict[str, str]:
     """Template-based fallback when LLM fails."""
     
+    verdict_val = verdict.value if hasattr(verdict, 'value') else str(verdict)
+    case_type_val = case_type.value if hasattr(case_type, 'value') else str(case_type)
+    
     templates = {
         "wrong_transfer": {
             "en": {
-                "summary": f"Customer reports wrong transfer. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict.value}.",
+                "summary": f"Customer reports wrong transfer. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
                 "action": "Verify transaction details and contact recipient if possible.",
                 "reply": f"We have noted your concern about transaction {matched_txn_id or 'mentioned'}. Our dispute team will review the case. Please do not share your PIN or OTP with anyone."
             },
             "bn": {
-                "summary": f"গ্রাহক ভুল ট্রান্সফার রিপোর্ট করেছেন। ট্রান্সাকশন {matched_txn_id or 'চিহ্নিত নয়'}। প্রমাণ: {verdict.value}।",
-                "action": "ট্রান্সাকশনের বিস্তারিত যাচাই করুন এবং প্রাপকের সাথে যোগাযোগ করুন।",
-                "reply": f"আমরা আপনার সমস্যা নোট করেছি। আমাদের টিম পর্যালোচনা করবে। অনুগ্রহ করে আপনার পিন বা ওটিপি কারো সাথে শেয়ার করবেন না।"
+                "summary": f"Customer reports wrong transfer. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Verify transaction details and contact recipient if possible.",
+                "reply": f"আপনার লেনদেন {matched_txn_id or 'উল্লেখিত'} এর বিষয়ে আমরা অবগত হয়েছি। অনুগ্রহ করে কারো সাথে আপনার পিন বা ওটিপি শেয়ার করবেন না। আমাদের বিরোধ নিষ্পত্তি দল এটি পর্যালোচনা করে অফিসিয়াল চ্যানেলে আপনাকে জানাবে।"
             }
         },
         "payment_failed": {
             "en": {
-                "summary": f"Payment failed but may have impacted balance. Transaction {matched_txn_id or 'not identified'}.",
+                "summary": f"Payment failed but may have impacted balance. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
                 "action": "Check transaction status and initiate reversal if applicable.",
                 "reply": "We are reviewing the transaction. Any eligible amount will be returned through official channels. Please do not share your PIN or OTP with anyone."
+            },
+            "bn": {
+                "summary": f"Payment failed but may have impacted balance. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Check transaction status and initiate reversal if applicable.",
+                "reply": "আপনার লেনদেনটি আমরা পর্যালোচনা করছি। যোগ্য পরিমাণ অর্থ অফিসিয়াল চ্যানেলে ফেরত দেওয়া হবে। অনুগ্রহ করে আপনার পিন বা ওটিপি কারো সাথে শেয়ার করবেন না।"
             }
         },
         "refund_request": {
             "en": {
-                "summary": "Customer requesting refund.",
+                "summary": f"Customer requesting refund. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
                 "action": "Review refund policy and merchant terms.",
                 "reply": "Refunds depend on the applicable policy. We will review your request. Please do not share your PIN or OTP with anyone."
+            },
+            "bn": {
+                "summary": f"Customer requesting refund. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Review refund policy and merchant terms.",
+                "reply": "পেমেন্ট রিফান্ড নীতিমালার ওপর নির্ভর করে। আমরা আপনার অনুরোধটি পর্যালোচনা করছি। অনুগ্রহ করে আপনার পিন বা ওটিপি কারো সাথে শেয়ার করবেন না।"
             }
         },
         "duplicate_payment": {
             "en": {
-                "summary": f"Possible duplicate payment. Transaction {matched_txn_id or 'not identified'}.",
+                "summary": f"Possible duplicate payment. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
                 "action": "Verify duplicate charges and process reversal if confirmed.",
                 "reply": "We are investigating the duplicate payment. Please do not share your PIN or OTP with anyone."
+            },
+            "bn": {
+                "summary": f"Possible duplicate payment. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Verify duplicate charges and process reversal if confirmed.",
+                "reply": "আমরা সম্ভাব্য দ্বৈত পেমেন্ট তদন্ত করছি। অনুগ্রহ করে আপনার পিন বা ওটিপি কারো সাথে শেয়ার করবেন না।"
             }
         },
         "phishing_or_social_engineering": {
@@ -163,12 +181,53 @@ def _fallback_templates(complaint: str, matched_txn_id: Optional[str], verdict: 
                 "summary": "Security alert: Possible phishing or social engineering attempt.",
                 "action": "URGENT: Flag account for security review. Contact customer immediately.",
                 "reply": "WARNING: Never share your PIN, OTP, or password with anyone. We will never ask for these. If you shared credentials, contact us immediately."
+            },
+            "bn": {
+                "summary": "Security alert: Possible phishing or social engineering attempt.",
+                "action": "URGENT: Flag account for security review. Contact customer immediately.",
+                "reply": "সতর্কতা: অনুগ্রহ করে আপনার পিন, ওটিপি বা পাসওয়ার্ড কারো সাথে শেয়ার করবেন না। আমরা কখনই এগুলো জানতে চাইব না। আপনি শেয়ার করে থাকলে অবিলম্বে আমাদের জানান।"
+            }
+        },
+        "merchant_settlement_delay": {
+            "en": {
+                "summary": f"Merchant reports settlement delay. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Check settlement batch run status and bank API connectivity.",
+                "reply": "We have noted your concern about settlement status. Our merchant operations team will check the batch status and update you."
+            },
+            "bn": {
+                "summary": f"Merchant reports settlement delay. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Check settlement batch run status and bank API connectivity.",
+                "reply": "সেটেলমেন্টের বিলম্বের বিষয়টি আমরা অবগত হয়েছি। আমাদের মার্চেন্ট অপারেশন্স টিম ব্যাচ স্ট্যাটাস পরীক্ষা করে আপনাকে আপডেট জানাবে।"
+            }
+        },
+        "agent_cash_in_issue": {
+            "en": {
+                "summary": f"Agent cash-in issue reported. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Verify agent wallet logs and system cash-in status.",
+                "reply": "We are verifying the cash-in status. Our agent operations team will contact you. Please do not share your PIN or OTP with anyone."
+            },
+            "bn": {
+                "summary": f"Agent cash-in issue reported. Transaction {matched_txn_id or 'not identified'}. Evidence: {verdict_val}.",
+                "action": "Verify agent wallet logs and system cash-in status.",
+                "reply": "ক্যাশ-ইন লেনদেনটি আমরা যাচাই করছি। আমাদের এজেন্ট অপারেশন্স টিম আপনার সাথে যোগাযোগ করবে। অনুগ্রহ করে আপনার পিন বা ওটিপি কারো সাথে শেয়ার করবেন না।"
+            }
+        },
+        "other": {
+            "en": {
+                "summary": f"General support request. Evidence: {verdict_val}.",
+                "action": "Analyze complaint details further and reply request for more information.",
+                "reply": "Thank you for reaching out. To help you faster, please share the transaction ID and a description of the issue. Please do not share your PIN or OTP."
+            },
+            "bn": {
+                "summary": f"General support request. Evidence: {verdict_val}.",
+                "action": "Analyze complaint details further and reply request for more information.",
+                "reply": "আমাদের সাথে যোগাযোগ করার জন্য ধন্যবাদ। দ্রুত সেবার জন্য অনুগ্রহ করে লেনদেন আইডি এবং সমস্যার বিবরণ প্রদান করুন। আপনার পিন বা ওটিপি শেয়ার করবেন না।"
             }
         }
     }
     
     lang = "bn" if language == "bn" else "en"
-    case_templates = templates.get(case_type.value, templates["refund_request"])
+    case_templates = templates.get(case_type_val, templates["other"])
     lang_template = case_templates.get(lang, case_templates.get("en", case_templates["en"]))
     
     return {

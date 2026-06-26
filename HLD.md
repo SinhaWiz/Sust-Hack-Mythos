@@ -1080,11 +1080,11 @@ How our design maximizes each scoring category:
 
 ### Phase 5: Multilingual (Priority 4)
 
-- [ ] Implement language detection (Bangla Unicode range analysis)
-- [ ] Ensure LLM prompt instructs reply in same language as complaint (with professional handling for `mixed`)
-- [ ] Create complete Bangla template fallback replies for all 8 case types
-- [ ] Test with Bangla complaint (Sample 07) → verify Bangla `customer_reply`
-- [ ] Test with mixed/Banglish input → verify professional handling
+- [x] Implement language detection (Bangla Unicode range analysis)
+- [x] Ensure LLM prompt instructs reply in same language as complaint (with professional handling for `mixed`)
+- [x] Create complete Bangla template fallback replies for all 8 case types
+- [x] Test with Bangla complaint (Sample 07) → verify Bangla `customer_reply`
+- [x] Test with mixed/Banglish input → verify professional handling
 
 ### Phase 6: Enterprise Deployment & Submission (Priority 4)
 

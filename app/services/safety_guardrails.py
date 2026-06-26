@@ -90,8 +90,9 @@ def _has_safety_reminder(text: str) -> bool:
     patterns = [
         r'do not share.*(?:pin|otp)',
         r'never share.*(?:pin|otp)',
-        r'পিন.*শেয়ার.*করবেন না',
-        r'ওটিপি.*শেয়ার.*করবেন না',
+        r'পিন.*শে[য়য়]ার.*করবেন\s*না',
+        r'ওটিপি.*শে[য়য়]ার.*করবেন\s*না',
+        r'পিন বা ওটিপি',
     ]
     for p in patterns:
         if re.search(p, text, re.IGNORECASE):
