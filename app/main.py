@@ -4,10 +4,11 @@ from fastapi.responses import JSONResponse
 import logging
 
 from app.models.request import AnalyzeTicketRequest
-from app.models.response import (
-    AnalyzeTicketResponse, EvidenceVerdictEnum, CaseTypeEnum,
-    SeverityEnum, DepartmentEnum
-)
+from app.models.response import AnalyzeTicketResponse
+from app.services.evidence_engine import ComplaintSignals, match_transaction, determine_verdict
+from app.services.classifier import classify_case_type, determine_severity, determine_department, determine_human_review_required
+from app.services.llm_provider import generate_texts
+from app.services.safety_guardrails import apply_safety_guardrails
 
 app = FastAPI(title="QueueStorm Investigator")
 logger = logging.getLogger("uvicorn.error")
@@ -77,23 +78,67 @@ async def health_check():
 @app.post("/analyze-ticket", response_model=AnalyzeTicketResponse)
 async def analyze_ticket(request: AnalyzeTicketRequest):
     if not request.complaint.strip():
-        # Handle whitespace-only complaints
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"error": "Complaint text cannot be empty", "ticket_id": request.ticket_id}
         )
+    
+    try:
+        # Step 1: Extract complaint signals
+        signals = ComplaintSignals(
+            request.complaint,
+            user_type=request.user_type.value if request.user_type else None
+        )
         
-    # Dummy response to verify schema and routing for Phase 1
-    response = AnalyzeTicketResponse(
-        ticket_id=request.ticket_id,
-        relevant_transaction_id="TXN-DUMMY",
-        evidence_verdict=EvidenceVerdictEnum.consistent,
-        case_type=CaseTypeEnum.other,
-        severity=SeverityEnum.low,
-        department=DepartmentEnum.customer_support,
-        agent_summary="Dummy summary for testing phase 1.",
-        recommended_next_action="Review case.",
-        customer_reply="We have noted your concern. Please do not share your PIN or OTP with anyone.",
-        human_review_required=False,
-    )
-    return response
+        # Step 2: Match transaction
+        matched_txn_id, confidence = match_transaction(signals, request.transaction_history)
+        
+        # Step 3: Determine evidence verdict
+        verdict = determine_verdict(signals, matched_txn_id, request.transaction_history)
+        
+        # Step 4: Classify case
+        case_type = classify_case_type(signals, verdict)
+        severity = determine_severity(case_type, verdict, signals)
+        department = determine_department(case_type, request.user_type)
+        human_review = determine_human_review_required(case_type, verdict, severity)
+        
+        # Step 5: Generate texts using LLM
+        from app.services.safety_guardrails import sanitize_complaint
+        sanitized_complaint = sanitize_complaint(request.complaint)
+        texts = generate_texts(
+            sanitized_complaint,
+            matched_txn_id,
+            verdict,
+            case_type,
+            language=request.language.value if request.language else "en"
+        )
+        
+        # Step 6: Apply safety guardrails
+        safe_texts = apply_safety_guardrails(
+            texts,
+            user_type=request.user_type.value if request.user_type else "customer"
+        )
+        
+        # Step 7: Build response
+        response = AnalyzeTicketResponse(
+            ticket_id=request.ticket_id,
+            relevant_transaction_id=matched_txn_id,
+            evidence_verdict=verdict,
+            case_type=case_type,
+            severity=severity,
+            department=department,
+            agent_summary=safe_texts["agent_summary"],
+            recommended_next_action=safe_texts["recommended_next_action"],
+            customer_reply=safe_texts["customer_reply"],
+            human_review_required=human_review,
+            confidence=confidence if confidence > 0 else None
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Processing error: {str(e)}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": "Internal processing error", "ticket_id": request.ticket_id}
+        )

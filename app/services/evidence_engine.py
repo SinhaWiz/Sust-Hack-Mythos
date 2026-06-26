@@ -56,7 +56,7 @@ class ComplaintSignals:
             return "phishing_or_social_engineering"
         if any(kw in text for kw in ["twice", "double", "duplicate"]):
             return "duplicate_payment"
-        if any(kw in text for kw in ["wrong number", "wrong person", "wrong recipient", "by mistake", "brother"]):
+        if any(kw in text for kw in ["wrong number", "wrong person", "wrong recipient", "by mistake", "brother", "ভুল নাম্বার", "ভুল"]):
             return "wrong_transfer"
         if any(kw in text for kw in ["settlement", "not settled", "sales of"]):
             return "merchant_settlement_delay"
@@ -144,16 +144,21 @@ def match_transaction(complaint_signals: ComplaintSignals, transaction_history: 
     if not scores:
         return None, 0.0
     
-    best_id = max(scores, key=scores.get)
-    best_score = scores[best_id]
+    best_score = max(scores.values())
     
+    # Get all transactions with the best score
     top_scorers = [tid for tid, s in scores.items() if s == best_score]
+    
+    # If multiple matches with same score, return the most recent one
     if len(top_scorers) > 1 and best_score > 0:
-        return None, 0.0
+        top_txns = [t for t in transaction_history if t.transaction_id in top_scorers]
+        top_txns.sort(key=lambda t: t.timestamp, reverse=True)
+        return top_txns[0].transaction_id, best_score
     
     if best_score < 2.0:
         return None, 0.0
     
+    best_id = max(scores, key=scores.get)
     return best_id, best_score
 
 def determine_verdict(complaint_signals: ComplaintSignals, matched_txn_id: Optional[str], all_transactions: Optional[List[TransactionHistoryItem]]) -> EvidenceVerdictEnum:
