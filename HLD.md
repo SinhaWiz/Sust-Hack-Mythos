@@ -60,38 +60,34 @@ The system must **cross-reference** the complaint text against the transaction h
 ## 2. System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                    QueueStorm Investigator Service                    │
-│                                                                      │
-│  ┌─────────┐   ┌──────────────┐   ┌────────────┐   ┌─────────────┐ │
-│  │  HTTP    │──▶│   Request    │──▶│  Evidence   │──▶│  Response   │ │
-│  │  Layer   │   │  Validator   │   │  Reasoning  │   │  Builder    │ │
-│  │(FastAPI) │   │  & Parser    │   │  Engine     │   │  & Safety   │ │
-│  └─────────┘   └──────────────┘   └────────────┘   └─────────────┘ │
-│       │                                  │                 │         │
-│       │                                  ▼                 ▼         │
-│       │                           ┌────────────┐   ┌─────────────┐  │
-│       │                           │    LLM     │   │   Safety    │  │
-│       │                           │  Provider  │   │  Guardrails │  │
-│       │                           │ (Gemini)   │   │   Module    │  │
-│       │                           └────────────┘   └─────────────┘  │
-│       │                                                              │
-│  ┌─────────┐                                                         │
-│  │ /health │  → {"status": "ok"}                                     │
-│  └─────────┘                                                         │
-└──────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                          QueueStorm Investigator Enterprise System                 │
+│                                                                                  │
+│   ┌────────┐     ┌─────────┐    ┌──────────┐     ┌──────────────┐                │
+│   │ NGINX  │────▶│ FastAPI │───▶│ RabbitMQ │────▶│ Worker Nodes │                │
+│   │ Proxy  │     │ Gateway │    │  (RPC)   │     │ (Core Logic) │                │
+│   └────────┘     └─────────┘    └──────────┘     └──────────────┘                │
+│                       │                                 │                        │
+│                       ▼                                 │                        │
+│                  ┌────────┐                             ▼                        │
+│                  │ Redis  │◀────────────────────────────┘                        │
+│                  │(Cache) │                                                      │
+│                  └────────┘                                                      │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
 | Component | Responsibility |
 |---|---|
-| **HTTP Layer** | Route handling, CORS, content-type validation |
-| **Request Validator** | JSON schema validation, required field checks, enum validation |
-| **Evidence Reasoning Engine** | Transaction matching, evidence verdict, case classification, severity, department routing |
-| **LLM Provider** | Natural language understanding, text generation (summaries, replies) |
-| **Safety Guardrails** | Post-processing filter on all text outputs — blocks credential requests, unauthorized promises, third-party redirects, prompt injection |
-| **Response Builder** | Assembles the final JSON response with all required fields |
+| **NGINX Proxy** | Reverse proxy, rate limiting, connection management |
+| **FastAPI Gateway** | Route handling, JSON schema validation, RPC queue publisher |
+| **Redis** | Caching identical requests to save LLM calls, tracking rate limits |
+| **RabbitMQ** | Message broker for RPC requests, distributes load among workers |
+| **Worker Node (Evidence Reasoning)** | Transaction matching, evidence verdict, case classification, severity, department routing |
+| **Worker Node (LLM Provider)** | Natural language understanding, text generation (summaries, replies) |
+| **Worker Node (Safety Guardrails)** | Post-processing filter on all text outputs — blocks credential requests, unauthorized promises, third-party redirects |
+| **Worker Node (Response Builder)** | Assembles the final JSON response with all required fields, publishes back to RabbitMQ |
 
 ---
 
@@ -104,10 +100,22 @@ flowchart TD
         H["GET /health"] --> I["Health Check"]
     end
 
-    subgraph Service["QueueStorm Investigator"]
-        B --> C["Request Validator"]
-        C -->|"Invalid"| D["400/422 Error Response"]
-        C -->|"Valid"| E["Evidence Reasoning Engine"]
+    subgraph Gateway["API Gateway Layer"]
+        B --> N["NGINX Proxy"]
+        N --> C["FastAPI Server"]
+        I --> N
+        N --> L["{'status': 'ok'}"]
+        
+        C --> C1["Request Validator"]
+        C1 -->|"Invalid"| D["400/422 Error Response"]
+        
+        C1 -->|"Valid"| R1{"Redis Cache"}
+        R1 -->|"Hit"| K["200 JSON Response (Cached)"]
+        R1 -->|"Miss"| RMQ1["RabbitMQ (RPC Queue)"]
+    end
+
+    subgraph Workers["Worker Nodes"]
+        RMQ1 --> E["Evidence Reasoning Engine"]
         
         E --> E1["Transaction Matcher"]
         E --> E2["Evidence Verdict Logic"]
@@ -127,10 +135,11 @@ flowchart TD
         G --> G4["Prompt Injection Defense"]
         
         G1 & G2 & G3 & G4 --> J["Response Builder"]
-        J --> K["200 JSON Response"]
-        
-        I --> L["{'status': 'ok'}"]
+        J --> R2["Redis (Save Cache)"]
+        J --> RMQ2["RabbitMQ (Callback Queue)"]
     end
+
+    RMQ2 --> K["200 JSON Response"]
 
     subgraph External["External Services"]
         F -.->|"API Call"| M["Google Gemini API"]
@@ -187,14 +196,15 @@ flowchart TD
 
 | Layer | Technology | Purpose |
 |---|---|---|
+| **Reverse Proxy** | NGINX | Load balancing, rate limiting |
+| **Cache & State** | Redis | Caching LLM responses, rate limiting |
+| **Message Broker**| RabbitMQ | RPC queuing for high concurrency |
 | **Runtime** | Python 3.12 | Core language |
 | **Framework** | FastAPI 0.115+ | HTTP endpoints, auto-validation |
 | **Validation** | Pydantic v2 | Request/response schema enforcement |
 | **LLM** | Google Gemini 2.0 Flash | NLU + text generation |
-| **LLM SDK** | `google-generativeai` | API client |
 | **Server** | Uvicorn | ASGI server |
-| **Containerization** | Docker (python:3.12-slim) | Deployment |
-| **Deployment** | Render / Railway / EC2 | Live URL |
+| **Containerization** | Docker + Compose | Multi-container deployment |
 | **Testing** | pytest + httpx | Integration tests |
 
 ---
@@ -338,7 +348,13 @@ Content-Type: application/json
 The `POST /analyze-ticket` handler follows this pipeline:
 
 ```
-Step 1: VALIDATE REQUEST
+Step 0: GATEWAY & CACHE
+    ├── NGINX proxies request to FastAPI
+    ├── FastAPI checks Redis for cached response by ticket_id hash
+    │   └── If cache hit → Return 200 immediately
+    └── If cache miss → Publish request to RabbitMQ RPC queue & await callback
+
+Step 1: VALIDATE REQUEST (Worker or Gateway)
     ├── Parse JSON body
     ├── Check required fields (ticket_id, complaint)
     ├── Validate enum values if present
@@ -425,11 +441,13 @@ Step 7: APPLY SAFETY GUARDRAILS (Post-Processing)
     ├── If violation detected → replace with safe template text
     └── Ensure PIN/OTP safety reminder is present in customer_reply
 
-Step 8: BUILD RESPONSE
+Step 8: BUILD RESPONSE & CACHE
     ├── Assemble all fields into response JSON
     ├── Add optional fields (confidence, reason_codes)
     ├── Validate against output schema (Pydantic)
-    └── Return 200 with response body
+    ├── Save JSON response to Redis Cache (TTL: 24 hours)
+    ├── Publish response to RabbitMQ callback queue
+    └── FastAPI Gateway consumes callback and returns HTTP 200
 ```
 
 ---
@@ -813,25 +831,55 @@ Endpoints:    GET /health, POST /analyze-ticket
 Port:         8000 (bound to 0.0.0.0)
 ```
 
-### Fallback: Docker Image (Path B)
+### Primary: Docker Compose Enterprise Stack
 
-```dockerfile
-FROM python:3.12-slim
+```yaml
+version: '3.8'
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api
+      
+  redis:
+    image: redis:alpine
+    expose:
+      - 6379
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    expose:
+      - 5672
+      - 15672
 
-COPY . .
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    expose:
+      - 8000
+    env_file: .env
+    depends_on:
+      - redis
+      - rabbitmq
 
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+  worker:
+    build: .
+    command: python -m app.worker
+    env_file: .env
+    depends_on:
+      - redis
+      - rabbitmq
+    deploy:
+      replicas: 3
 ```
 
 ```bash
-# Build & Run
-docker build -t queuestorm-mythos .
-docker run -p 8000:8000 --env-file .env queuestorm-mythos
+# Build & Run Stack
+docker-compose up -d --build
 ```
 
 ### Environment Variables
@@ -852,7 +900,10 @@ LOG_LEVEL=info             # Logging level
 Sust-Hack-Mythos/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                    # FastAPI app, route definitions
+│   ├── main.py                    # FastAPI app, route definitions, RPC client
+│   ├── worker.py                  # RabbitMQ consumer, core logic runner
+│   ├── broker.py                  # RabbitMQ connection and queues
+│   ├── cache.py                   # Redis connection and logic
 │   ├── config.py                  # Environment variable loading
 │   ├── models/
 │   │   ├── __init__.py
@@ -1035,13 +1086,14 @@ How our design maximizes each scoring category:
 - [ ] Test with Bangla complaint (Sample 07) → verify Bangla `customer_reply`
 - [ ] Test with mixed/Banglish input → verify professional handling
 
-### Phase 6: Deployment & Submission Requirements (Priority 4)
+### Phase 6: Enterprise Deployment & Submission (Priority 4)
 
+- [ ] Set up `docker-compose.yml` with NGINX, Redis, RabbitMQ, API, and Workers
+- [ ] Configure `nginx.conf` for reverse proxying and rate limiting
 - [ ] Create `Dockerfile` (python:3.12-slim based)
 - [ ] Create `.env.example` with all required variable names
-- [ ] Test Docker build locally
-- [ ] Test Docker run locally with `--env-file`
-- [ ] Deploy to Render/Railway/EC2
+- [ ] Test Docker Compose build & run locally
+- [ ] Deploy stack to EC2 / DigitalOcean
 - [ ] Verify `GET /health` from external URL
 - [ ] Verify `POST /analyze-ticket` from external URL with sample case
 - [ ] Ensure service stays running during evaluation window
