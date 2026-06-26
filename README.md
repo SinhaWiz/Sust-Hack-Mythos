@@ -1,5 +1,7 @@
 # QueueStorm Investigator — Enterprise SupportOps AI Copilot
 
+**Live Deployed API URL**: [https://sust-hack-mythos.onrender.com](https://sust-hack-mythos.onrender.com)
+
 [![Python Version](https://img.shields.io/badge/Python-3.13%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v0.111%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Redis](https://img.shields.io/badge/Redis-Cache%20%26%20RateLimit-red?logo=redis&logoColor=white)](https://redis.io/)
