@@ -8,7 +8,8 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger("uvicorn.error")
 
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("AMQP_URL")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", 5672))
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "guest")
@@ -23,15 +24,26 @@ class TicketAnalysisRPCClient:
 
     async def connect(self):
         """Establish connection to RabbitMQ."""
+        if not RABBITMQ_URL and not RABBITMQ_HOST:
+            logger.info("RabbitMQ is not configured. Set RABBITMQ_URL or RABBITMQ_HOST to enable RPC.")
+            self.connection = None
+            return
+
         self.loop = asyncio.get_running_loop()
         try:
-            self.connection = await aio_pika.connect_robust(
-                host=RABBITMQ_HOST,
-                port=RABBITMQ_PORT,
-                login=RABBITMQ_USER,
-                password=RABBITMQ_PASS,
-                timeout=2.0
-            )
+            if RABBITMQ_URL:
+                self.connection = await aio_pika.connect_robust(
+                    RABBITMQ_URL,
+                    timeout=2.0
+                )
+            else:
+                self.connection = await aio_pika.connect_robust(
+                    host=RABBITMQ_HOST,
+                    port=RABBITMQ_PORT,
+                    login=RABBITMQ_USER,
+                    password=RABBITMQ_PASS,
+                    timeout=2.0
+                )
             self.channel = await self.connection.channel()
             self.callback_queue = await self.channel.declare_queue(
                 name="", exclusive=True
@@ -39,7 +51,8 @@ class TicketAnalysisRPCClient:
             await self.callback_queue.consume(self.on_response, no_ack=True)
             logger.info("Connected to RabbitMQ RPC broker successfully.")
         except Exception as e:
-            logger.warning(f"RabbitMQ is unavailable at {RABBITMQ_HOST}:{RABBITMQ_PORT} ({type(e).__name__}). RPC is disabled.")
+            target = RABBITMQ_URL or f"{RABBITMQ_HOST}:{RABBITMQ_PORT}"
+            logger.warning(f"RabbitMQ is unavailable at {target} ({type(e).__name__}). RPC is disabled.")
             self.connection = None
 
     async def on_response(self, message: aio_pika.abc.AbstractIncomingMessage):

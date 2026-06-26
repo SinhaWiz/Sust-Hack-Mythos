@@ -39,7 +39,7 @@ services:
       - .env
     environment:
       - REDIS_HOST=redis
-      - RABBITMQ_HOST=${RABBITMQ_HOST:?warthoge}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:?Set RABBITMQ_HOST to your external RabbitMQ hostname}
       - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
       - RABBITMQ_USER=${RABBITMQ_USER:-guest}
       - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}

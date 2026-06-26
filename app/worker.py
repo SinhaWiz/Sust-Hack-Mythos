@@ -9,22 +9,35 @@ from app.services.analyzer import run_analysis_pipeline
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("queue_worker")
 
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("AMQP_URL")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", 5672))
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "guest")
 
 async def main():
     while True:
+        if not RABBITMQ_URL and not RABBITMQ_HOST:
+            logger.error("RabbitMQ is not configured. Set RABBITMQ_URL or RABBITMQ_HOST. Retrying in 30 seconds...")
+            await asyncio.sleep(30)
+            continue
+
         try:
-            logger.info(f"Connecting to RabbitMQ at {RABBITMQ_HOST}:{RABBITMQ_PORT}...")
-            connection = await aio_pika.connect_robust(
-                host=RABBITMQ_HOST,
-                port=RABBITMQ_PORT,
-                login=RABBITMQ_USER,
-                password=RABBITMQ_PASS,
-                timeout=5.0
-            )
+            if RABBITMQ_URL:
+                logger.info("Connecting to RabbitMQ using RABBITMQ_URL...")
+                connection = await aio_pika.connect_robust(
+                    RABBITMQ_URL,
+                    timeout=5.0
+                )
+            else:
+                logger.info(f"Connecting to RabbitMQ at {RABBITMQ_HOST}:{RABBITMQ_PORT}...")
+                connection = await aio_pika.connect_robust(
+                    host=RABBITMQ_HOST,
+                    port=RABBITMQ_PORT,
+                    login=RABBITMQ_USER,
+                    password=RABBITMQ_PASS,
+                    timeout=5.0
+                )
             
             async with connection:
                 channel = await connection.channel()
