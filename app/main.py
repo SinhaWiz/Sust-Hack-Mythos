@@ -2,16 +2,27 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import logging
+from contextlib import asynccontextmanager
 
 from app.models.request import AnalyzeTicketRequest
 from app.models.response import AnalyzeTicketResponse
-from app.services.evidence_engine import ComplaintSignals, match_transaction, determine_verdict
-from app.services.classifier import classify_case_type, determine_severity, determine_department, determine_human_review_required
-from app.services.llm_provider import generate_texts
-from app.services.safety_guardrails import apply_safety_guardrails
+from app.services.analyzer import run_analysis_pipeline
+from app.cache import get_cached_ticket, set_cached_ticket
+from app.broker import TicketAnalysisRPCClient
 
-app = FastAPI(title="QueueStorm Investigator")
 logger = logging.getLogger("uvicorn.error")
+
+rpc_client = TicketAnalysisRPCClient()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Establish connection to RabbitMQ RPC client on startup
+    await rpc_client.connect()
+    yield
+    # Close connection on shutdown
+    await rpc_client.close()
+
+app = FastAPI(title="QueueStorm Investigator", lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -75,7 +86,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def health_check():
     return {"status": "ok"}
 
-@app.post("/analyze-ticket", response_model=AnalyzeTicketResponse)
+@app.post("/analyze-ticket")
 async def analyze_ticket(request: AnalyzeTicketRequest):
     if not request.complaint.strip():
         return JSONResponse(
@@ -84,63 +95,44 @@ async def analyze_ticket(request: AnalyzeTicketRequest):
         )
     
     try:
-        # Step 1: Extract complaint signals
-        signals = ComplaintSignals(
-            request.complaint,
-            user_type=request.user_type.value if request.user_type else None
-        )
+        # Step 1: Check Redis Cache
+        try:
+            cached_data = get_cached_ticket(request.ticket_id)
+            if cached_data:
+                return AnalyzeTicketResponse(**cached_data)
+        except Exception as cache_err:
+            logger.warning(f"Failed to query cache: {cache_err}")
+
+        # Step 2: Attempt RabbitMQ RPC processing
+        response_data = None
+        import os
+        if "PYTEST_CURRENT_TEST" not in os.environ and rpc_client.connection and not rpc_client.connection.is_closed:
+            try:
+                payload = request.model_dump(mode="json")
+                response_data = await rpc_client.call(payload, timeout=12.0)
+                logger.info(f"Processed ticket_id: {request.ticket_id} via RabbitMQ RPC.")
+            except Exception as rpc_err:
+                logger.warning(f"RabbitMQ RPC failed ({type(rpc_err).__name__}). Falling back to in-process pipeline.")
         
-        # Step 2: Match transaction
-        matched_txn_id, confidence = match_transaction(signals, request.transaction_history)
-        
-        # Step 3: Determine evidence verdict
-        verdict = determine_verdict(signals, matched_txn_id, request.transaction_history)
-        
-        # Step 4: Classify case
-        case_type = classify_case_type(signals, verdict)
-        severity = determine_severity(case_type, verdict, signals)
-        department = determine_department(case_type, request.user_type)
-        human_review = determine_human_review_required(case_type, verdict, severity)
-        
-        # Step 5: Generate texts using LLM
-        from app.services.safety_guardrails import sanitize_complaint
-        from app.services.language import detect_language
-        
-        sanitized_complaint = sanitize_complaint(request.complaint)
-        detected_lang = request.language.value if request.language else detect_language(request.complaint)
-        
-        texts = generate_texts(
-            sanitized_complaint,
-            matched_txn_id,
-            verdict,
-            case_type,
-            language=detected_lang,
-            user_type=request.user_type.value if request.user_type else "customer",
-            transaction_history=request.transaction_history
-        )
-        
-        # Step 6: Apply safety guardrails
-        safe_texts = apply_safety_guardrails(
-            texts,
-            user_type=request.user_type.value if request.user_type else "customer"
-        )
-        
-        # Step 7: Build response
-        response = AnalyzeTicketResponse(
-            ticket_id=request.ticket_id,
-            relevant_transaction_id=matched_txn_id,
-            evidence_verdict=verdict,
-            case_type=case_type,
-            severity=severity,
-            department=department,
-            agent_summary=safe_texts["agent_summary"],
-            recommended_next_action=safe_texts["recommended_next_action"],
-            customer_reply=safe_texts["customer_reply"],
-            human_review_required=human_review,
-            confidence=confidence if confidence > 0 else None
-        )
-        
-        return response
+        if response_data is None:
+            # Step 3: Fall back to in-process execution
+            payload = request.model_dump(mode="json")
+            response_data = run_analysis_pipeline(payload)
+
+        # Step 4: Write to Redis Cache
+        try:
+            set_cached_ticket(request.ticket_id, response_data)
+        except Exception as cache_err:
+            logger.warning(f"Failed to update cache: {cache_err}")
+
+        # Step 5: Format response
+        if "error" in response_data:
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": response_data["error"], "ticket_id": request.ticket_id}
+            )
+
+        return AnalyzeTicketResponse(**response_data)
         
     except Exception as e:
         logger.error(f"Processing error: {str(e)}")

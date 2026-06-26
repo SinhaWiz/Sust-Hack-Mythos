@@ -32,6 +32,21 @@ services:
       - .env.example
     environment:
       - PORT=8000
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - redis
+      - rabbitmq
+    restart: always
+
+  worker:
+    build: .
+    command: python -m app.worker
+    env_file:
+      - .env.example
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
     depends_on:
       - redis
       - rabbitmq
