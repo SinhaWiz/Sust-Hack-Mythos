@@ -82,9 +82,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"error": "Internal processing error", "ticket_id": ticket_id}
     )
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "ok"}
+
 
 @app.post("/analyze-ticket")
 async def analyze_ticket(request: AnalyzeTicketRequest):
