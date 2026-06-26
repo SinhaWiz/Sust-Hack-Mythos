@@ -86,6 +86,13 @@ Matched Transaction ID: {matched_txn_id or "None"}
 
 Remember: Return ONLY valid JSON with fields: "agent_summary", "recommended_next_action", and "customer_reply"."""
 
+        # Check pre-emptive rate limiting
+        from app.services.rate_limiter import check_and_update_rate_limits
+        estimated_tokens = len(prompt) // 4
+        if not check_and_update_rate_limits(estimated_tokens):
+            logger.warning("Pre-emptive rate limiting triggered. Using template fallback.")
+            return _fallback_templates(complaint, matched_txn_id, verdict, case_type, language)
+
         response = model.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
