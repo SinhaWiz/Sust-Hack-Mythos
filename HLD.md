@@ -1055,28 +1055,28 @@ How our design maximizes each scoring category:
 
 ### Phase 3: Safety Guardrails (Priority 3 — Critical)
 
-- [ ] Implement credential request regex patterns (PIN/OTP/password/card)
-- [ ] Implement unauthorized promise regex patterns (refund/reversal/unblock)
-- [ ] Implement third-party redirect regex patterns
-- [ ] Build safety check pipeline that scans `customer_reply` and `recommended_next_action`
-- [ ] Implement safe template replacement when violations detected
-- [ ] Ensure every non-merchant `customer_reply` includes "do not share your PIN or OTP" reminder
-- [ ] Implement prompt injection defense in LLM system prompt and `sanitize_complaint` wrapper
-- [ ] Test: Send complaint with "Please share your OTP" → verify reply does NOT ask for OTP
-- [ ] Test: Verify no response ever promises "we will refund you"
-- [ ] Test: Verify phishing cases route to `fraud_risk` with `severity: critical`
+- [x] Implement credential request regex patterns (PIN/OTP/password/card)
+- [x] Implement unauthorized promise regex patterns (refund/reversal/unblock)
+- [x] Implement third-party redirect regex patterns
+- [x] Build safety check pipeline that scans `customer_reply` and `recommended_next_action`
+- [x] Implement safe template replacement when violations detected
+- [x] Ensure every non-merchant `customer_reply` includes "do not share your PIN or OTP" reminder
+- [x] Implement prompt injection defense in LLM system prompt and `sanitize_complaint` wrapper
+- [x] Test: Send complaint with "Please share your OTP" → verify reply does NOT ask for OTP
+- [x] Test: Verify no response ever promises "we will refund you"
+- [x] Test: Verify phishing cases route to `fraud_risk` with `severity: critical`
 
 ### Phase 4: LLM Integration (Priority 3.5)
 
-- [ ] Set up Gemini API client with API key from environment variable
-- [ ] Build structured system prompt with safety instructions, `user_type` tone adaptation, and Banglish guidance
-- [ ] Build per-request prompt with complaint, transactions, verdict, classification, `user_type`, and `language`
-- [ ] Request JSON-structured output (agent_summary, recommended_next_action, customer_reply)
-- [ ] Parse LLM response and validate against expected structure
-- [ ] Implement 15-second timeout for LLM calls
-- [ ] Implement template-based fallback when LLM fails
-- [ ] Test LLM generates Bangla reply for Bangla complaint (Sample 07)
-- [ ] Test fallback works when LLM is unavailable
+- [x] Set up Gemini API client with API key from environment variable
+- [x] Build structured system prompt with safety instructions, `user_type` tone adaptation, and Banglish guidance
+- [x] Build per-request prompt with complaint, transactions, verdict, classification, `user_type`, and `language`
+- [x] Request JSON-structured output (agent_summary, recommended_next_action, customer_reply)
+- [x] Parse LLM response and validate against expected structure
+- [x] Implement 15-second timeout for LLM calls
+- [x] Implement template-based fallback when LLM fails
+- [x] Test LLM generates Bangla reply for Bangla complaint (Sample 07)
+- [x] Test fallback works when LLM is unavailable
 
 ### Phase 5: Multilingual (Priority 4)
 

@@ -149,11 +149,9 @@ def match_transaction(complaint_signals: ComplaintSignals, transaction_history: 
     # Get all transactions with the best score
     top_scorers = [tid for tid, s in scores.items() if s == best_score]
     
-    # If multiple matches with same score, return the most recent one
+    # If multiple matches with same score, it is ambiguous
     if len(top_scorers) > 1 and best_score > 0:
-        top_txns = [t for t in transaction_history if t.transaction_id in top_scorers]
-        top_txns.sort(key=lambda t: t.timestamp, reverse=True)
-        return top_txns[0].transaction_id, best_score
+        return None, 0.0
     
     if best_score < 2.0:
         return None, 0.0

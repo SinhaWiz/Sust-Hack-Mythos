@@ -110,7 +110,9 @@ async def analyze_ticket(request: AnalyzeTicketRequest):
             matched_txn_id,
             verdict,
             case_type,
-            language=request.language.value if request.language else "en"
+            language=request.language.value if request.language else "en",
+            user_type=request.user_type.value if request.user_type else "customer",
+            transaction_history=request.transaction_history
         )
         
         # Step 6: Apply safety guardrails
