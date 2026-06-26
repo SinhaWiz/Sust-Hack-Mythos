@@ -1102,19 +1102,20 @@ How our design maximizes each scoring category:
 
 ### Phase 7: Documentation (Priority 5)
 
-- [ ] Write README.md with:
-  - [ ] Project overview
-  - [ ] Setup instructions (local + Docker)
-  - [ ] Run command
-  - [ ] Tech stack
-  - [ ] MODELS section (list every model, where it runs, why chosen)
-  - [ ] Model and cost reasoning (explain free tier choices and zero operating costs)
-  - [ ] AI approach explanation
-  - [ ] Safety logic explanation
-  - [ ] Assumptions and known limitations
-  - [ ] Sample request & response
-- [ ] Generate `sample_output/sample_output.json` from a sample case
-- [ ] Add `.gitignore` (exclude .env, __pycache__, etc.)
+- [x] Write README.md with:
+  - [x] Project overview
+  - [x] Setup instructions (local + Docker)
+  - [x] Run command
+  - [x] Tech stack
+  - [x] MODELS section (list every model, where it runs, why chosen)
+  - [x] Model and cost reasoning (explain free tier choices and zero operating costs)
+  - [x] AI approach explanation
+  - [x] Safety logic explanation
+  - [x] Assumptions and known limitations
+  - [x] Sample request & response
+- [x] Generate `sample_output/sample_output.json` from a sample case
+- [x] Add `.gitignore` (exclude .env, __pycache__, etc.)
+
 
 ---
 
