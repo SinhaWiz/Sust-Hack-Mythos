@@ -1,7 +1,9 @@
+# pyrefly: ignore [missing-import]
 import pytest
 from app.services.analyzer import run_analysis_pipeline
 from app.cache import get_redis_client, get_cached_ticket, set_cached_ticket
 from app.broker import TicketAnalysisRPCClient
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 from app.main import app
 
