@@ -175,7 +175,7 @@ flowchart TD
 
 ### LLM Provider
 
-| Criteria | Google Gemini Flash | OpenAI GPT-4o-mini | Anthropic Claude Haiku | Rule-Based Only |
+| Criteria | Google Gemini 2.5 Flash | OpenAI GPT-4o-mini | Anthropic Claude Haiku | Rule-Based Only |
 |---|---|---|---|---|
 | **Cost** | ⭐⭐⭐⭐⭐ (very generous free tier) | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ (free) |
 | **Speed (latency)** | ⭐⭐⭐⭐⭐ (< 3s) | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
@@ -184,11 +184,11 @@ flowchart TD
 | **Reliability** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | **Free Tier** | 15 RPM / 1M tokens free | Pay-per-use | Pay-per-use | N/A |
 
-### ✅ Decision: **Hybrid — Rule-Based Core + Google Gemini 2.0 Flash as LLM**
+### ✅ Decision: **Hybrid — Rule-Based Core + Google Gemini 2.5 Flash as LLM**
 
 **Rationale**:
 - **Rule-based logic handles deterministic tasks**: transaction matching, evidence verdict, case classification, severity assessment, department routing — these don't need an LLM and are more reliable
-- **Gemini Flash handles language tasks**: understanding Bangla/mixed complaints, generating natural agent summaries, customer replies, and recommended next actions
+- **Gemini 2.5 Flash handles language tasks**: understanding Bangla/mixed complaints, generating natural agent summaries, customer replies, and recommended next actions
 - **Gemini's free tier** (15 RPM, 1M tokens/day) is sufficient for hackathon evaluation
 - **Fallback design**: If Gemini fails (rate limit, timeout), the system falls back to **template-based** text generation — the service never crashes
 
@@ -418,7 +418,7 @@ Step 5: CLASSIFY & ROUTE (Rule-Based)
         ├── High/critical severity (excluding automated SLA reversal flows like failed payments) → true
         └── Clear low-risk cases or clarification requests → false
 
-Step 6: GENERATE TEXT (LLM — Gemini Flash)
+Step 6: GENERATE TEXT (LLM — Gemini 2.5 Flash)
     ├── Construct structured prompt with:
     │   ├── Complaint text
     │   ├── Matched transaction details
@@ -805,7 +805,7 @@ Total worst case with fallback: < 1 second
 ```python
 async def call_llm_with_fallback(prompt: str, timeout: float = 15.0) -> dict:
     """
-    Calls Gemini Flash with timeout. Falls back to templates on failure.
+    Calls Gemini 2.5 Flash with timeout. Falls back to templates on failure.
     """
     try:
         response = await asyncio.wait_for(
@@ -887,7 +887,7 @@ docker-compose up -d --build
 ```bash
 # .env.example
 GEMINI_API_KEY=            # Google Gemini API key (required if using LLM)
-MODEL_NAME=gemini-2.0-flash  # Model to use
+MODEL_NAME=gemini-2.5-flash  # Model to use
 PORT=8000                  # Server port
 LOG_LEVEL=info             # Logging level
 ```
@@ -982,7 +982,7 @@ How our design maximizes each scoring category:
 
 | Sub-criterion | Our Approach | Expected Score |
 |---|---|---|
-| < 5s p95 latency | Rule-based core + fast LLM (Gemini Flash) | High |
+| < 5s p95 latency | Rule-based core + fast LLM (Gemini 2.5 Flash) | High |
 | < 30s per request | 15s LLM timeout + template fallback | Full |
 | No crashes on bad input | Global exception handler + Pydantic validation | Full |
 | Stable under load | Async FastAPI + Uvicorn workers | High |
@@ -1022,36 +1022,36 @@ How our design maximizes each scoring category:
 
 ### Phase 1: Foundation (Priority 1 — Schema & Endpoints)
 
-- [ ] Initialize Python project with `requirements.txt`
-- [ ] Create FastAPI app skeleton in `app/main.py`
-- [ ] Implement `GET /health` endpoint → `{"status": "ok"}`
-- [ ] Define Pydantic request model (`AnalyzeTicketRequest`) with all fields and enum validation
-- [ ] Define Pydantic response model (`AnalyzeTicketResponse`) with all fields and enum validation
-- [ ] Implement `POST /analyze-ticket` route with request validation
-- [ ] Add HTTP 400 handler for malformed JSON / missing required fields
-- [ ] Add HTTP 422 handler for empty complaint
-- [ ] Add HTTP 500 handler (global exception handler — no stack traces)
-- [ ] Verify all enum values are exactly as specified (case-sensitive)
-- [ ] Test with sample case input → confirm valid JSON output with all required fields
+- [x] Initialize Python project with `requirements.txt`
+- [x] Create FastAPI app skeleton in `app/main.py`
+- [x] Implement `GET /health` endpoint → `{"status": "ok"}`
+- [x] Define Pydantic request model (`AnalyzeTicketRequest`) with all fields and enum validation
+- [x] Define Pydantic response model (`AnalyzeTicketResponse`) with all fields and enum validation
+- [x] Implement `POST /analyze-ticket` route with request validation
+- [x] Add HTTP 400 handler for malformed JSON / missing required fields
+- [x] Add HTTP 422 handler for empty complaint
+- [x] Add HTTP 500 handler (global exception handler — no stack traces)
+- [x] Verify all enum values are exactly as specified (case-sensitive)
+- [x] Test with sample case input → confirm valid JSON output with all required fields
 
 ### Phase 2: Evidence Reasoning (Priority 2 — Highest Score)
 
-- [ ] Implement complaint signal extraction (amounts, times, keywords, counterparties)
-- [ ] Implement transaction matching algorithm with multi-signal scoring
-- [ ] Handle ambiguous matches (multiple equal-score transactions → null)
-- [ ] Handle no-match cases → `relevant_transaction_id: null`
-- [ ] Handle empty/missing `transaction_history`
-- [ ] Implement evidence verdict logic (`consistent` / `inconsistent` / `insufficient_data`)
-- [ ] Implement inconsistency pattern detection (established recipient, amount mismatch)
-- [ ] Implement duplicate payment detection (same amount, same counterparty, close timestamps)
-- [ ] Implement case_type classification from complaint + evidence
-- [ ] Implement severity assessment rules
-- [ ] Implement department routing (case_type → department mapping)
-- [ ] Implement `human_review_required` logic
-- [ ] Test all 10 sample cases for correct `relevant_transaction_id`
-- [ ] Test all 10 sample cases for correct `evidence_verdict`
-- [ ] Test all 10 sample cases for correct `case_type`
-- [ ] Test all 10 sample cases for correct `department`
+- [x] Implement complaint signal extraction (amounts, times, keywords, counterparties)
+- [x] Implement transaction matching algorithm with multi-signal scoring
+- [x] Handle ambiguous matches (multiple equal-score transactions → null)
+- [x] Handle no-match cases → `relevant_transaction_id: null`
+- [x] Handle empty/missing `transaction_history`
+- [x] Implement evidence verdict logic (`consistent` / `inconsistent` / `insufficient_data`)
+- [x] Implement inconsistency pattern detection (established recipient, amount mismatch)
+- [x] Implement duplicate payment detection (same amount, same counterparty, close timestamps)
+- [x] Implement case_type classification from complaint + evidence
+- [x] Implement severity assessment rules
+- [x] Implement department routing (case_type → department mapping)
+- [x] Implement `human_review_required` logic
+- [x] Test all 10 sample cases for correct `relevant_transaction_id`
+- [x] Test all 10 sample cases for correct `evidence_verdict`
+- [x] Test all 10 sample cases for correct `case_type`
+- [x] Test all 10 sample cases for correct `department`
 
 ### Phase 3: Safety Guardrails (Priority 3 — Critical)
 
@@ -1252,7 +1252,7 @@ Respond in valid JSON with keys: agent_summary, recommended_next_action, custome
 | **LLM for text generation only** | The LLM generates natural language (summaries, replies, actions) but does NOT make classification or routing decisions. This keeps the core logic deterministic and testable. |
 | **Post-processing safety filters** | Safety guardrails run AFTER the LLM generates text, catching any violations before the response is sent. This is defense-in-depth — even if the LLM hallucinates unsafe text, the filter catches it. |
 | **Template fallback system** | If the LLM fails for any reason, pre-written safe templates generate acceptable text. The service never crashes or returns incomplete responses. |
-| **Gemini Flash over GPT-4o** | Gemini 2.0 Flash has a generous free tier (15 RPM), excellent Bangla support, fast response times (< 3s), and native JSON mode. For a hackathon with no provided API credits, cost matters. |
+| **Gemini 2.5 Flash over GPT-4o** | Gemini 2.5 Flash has a generous free tier (15 RPM), excellent Bangla support, fast response times (< 3s), and native JSON mode. For a hackathon with no provided API credits, cost matters. |
 | **FastAPI over Flask** | FastAPI provides automatic request validation via Pydantic, proper 422 responses, async support, and auto-generated OpenAPI docs. It's strictly better for this schema-heavy API task. |
 | **Confidence scoring** | Optional but included. Derived from transaction match score + evidence verdict clarity. Helps judges see that the system is self-aware about its certainty. |
 
