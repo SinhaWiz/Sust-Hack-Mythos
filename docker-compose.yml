@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nginx:
     image: nginx:alpine
@@ -17,13 +15,6 @@ services:
       - 6379
     restart: always
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    expose:
-      - 5672
-      - 15672
-    restart: always
-
   api:
     build: .
     expose:
@@ -33,10 +24,12 @@ services:
     environment:
       - PORT=8000
       - REDIS_HOST=redis
-      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_HOST=${RABBITMQ_HOST:?Set RABBITMQ_HOST to your external RabbitMQ hostname}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
     depends_on:
       - redis
-      - rabbitmq
     restart: always
 
   worker:
@@ -46,8 +39,10 @@ services:
       - .env
     environment:
       - REDIS_HOST=redis
-      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_HOST=${RABBITMQ_HOST:?warthoge}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
     depends_on:
       - redis
-      - rabbitmq
     restart: always
